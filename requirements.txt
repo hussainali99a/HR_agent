@@ -1,0 +1,34 @@
+# Python Requirements for HR Recruitment Agent
+# Install all at once with: pip install -r requirements.txt
+
+# Core Libraries
+openai>=0.27.0
+pandas>=1.5.0
+numpy>=1.23.0
+
+# Web Interface
+streamlit>=1.28.0
+plotly>=5.15.0
+
+# PDF Processing
+pdfplumber>=0.9.0
+
+# Machine Learning & Text Processing
+scikit-learn>=1.3.0
+
+# Google APIs
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.92.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# Database
+# sqlite3 is built-in with Python
+
+# Optional: For LinkedIn integration
+# linkedin-api>=2.2.0
+
+# Optional: For background checks
+# requests>=2.31.0
