@@ -31,14 +31,16 @@ SCORING GUIDELINES:
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import google.generativeai as genai
-import json
 import re
-import os
+import json
+from config import OPENAI_API_KEY
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-genai.configure(api_key=GEMINI_API_KEY)
+# Try to import OpenAI
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 # ============================================================================
 # AI-BASED RESUME EVALUATION SYSTEM PROMPT
@@ -112,7 +114,7 @@ You are an AI hiring assistant.
 
 Evaluate how well the resume matches the job description.
 
-Always Return ONLY valid JSON, no markdown, only json:
+Return ONLY valid JSON:
 
 {{
   "match_score": 0.0,
@@ -147,51 +149,94 @@ JOB:
 {job_description}
 """
 
+def evaluate_resume_with_ai(resume_text, job_description):
+    """
+    Evaluate resume using OpenAI's GPT model with detailed criteria
+    
+    Args:
+        resume_text: Full text from candidate resume
+        job_description: Full text from job description
+    
+    Returns:
+        Tuple of (score, recommendation, analysis_dict)
+    """
+    if not OPENAI_AVAILABLE or not OPENAI_API_KEY:
+        print("⚠️  OpenAI not available, falling back to TF-IDF matching...")
+        return None, None, None
 
 def evaluate_resume_with_ai(resume_text, job_description):
+    """
+    Evaluate resume using OpenAI's GPT model with detailed criteria
+    
+    Args:
+        resume_text: Full text from candidate resume
+        job_description: Full text from job description
+    
+    Returns:
+        Tuple of (score, recommendation, analysis_dict)
+    """
+    if not OPENAI_AVAILABLE or not OPENAI_API_KEY:
+        print("⚠️  OpenAI not available, falling back to TF-IDF matching...")
+        return None, None, None
+    
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash-lite")
-
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        
+        # Format the prompt with resume and job description
         prompt = AI_EVALUATION_PROMPT.format(
-            resume=resume_text,
-            job_description=job_description
+            resume=resume_text,  # Limit to first 3000 chars
+            job_description=job_description  # Limit to first 2000 chars
         )
-
-        print("🤖 Evaluating resume with Gemini...")
-
-        response = model.generate_content(
-            prompt,
-            generation_config={
-                "temperature": 0.3,
-            }
+        
+        print("🤖 Evaluating resume with AI...")
+        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                # {
+                #     "role": "system",
+                #     "content": "You are an expert HR hiring assistant. Return ONLY valid JSON, no other text."
+                # },
+                {
+                    "role": "system",
+                    "content": "Return ONLY JSON. Be lenient with partial matches. Do not reject unless clearly unqualified."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.3,
+            max_tokens=500
         )
-
-        response_text = response.text
-        print(response_text)
-        response_text = response_text.strip()
-
-        # 🔧 Clean JSON (Gemini sometimes adds ```json)
-        if "```" in response_text:
-            response_text = response_text.split("```")[1]
-            if response_text.startswith("json"):
-                response_text = response_text[4:]
-
-        # Extract JSON safely
-        start = response_text.find("{")
-        end = response_text.rfind("}") + 1
-        json_str = response_text[start:end]
-
-        analysis = json.loads(json_str)
-
+        
+        # Parse the response
+        response_text = response.choices[0].message.content.strip()
+        
+        # Try to extract JSON if there's extra text
+        try:
+            # Find JSON object in response
+            start_idx = response_text.find('{')
+            end_idx = response_text.rfind('}') + 1
+            if start_idx >= 0 and end_idx > start_idx:
+                json_str = response_text[start_idx:end_idx]
+                analysis = json.loads(json_str)
+            else:
+                analysis = json.loads(response_text)
+        except json.JSONDecodeError:
+            print("⚠️  Could not parse AI response, using defaults...")
+            return None, None, None
+        
         return (
-            analysis.get("match_score", 0.5),
-            analysis.get("recommendation", "HOLD"),
+            analysis.get('match_score', 0.5),
+            analysis.get('recommendation', 'HOLD'),
             analysis
         )
-
+    
     except Exception as e:
-        print(f"⚠️ Gemini evaluation error: {e}")
+        print(f"⚠️  AI evaluation error: {e}. Falling back to TF-IDF...")
         return None, None, None
+
 
 # ============================================================================
 # LEGACY TF-IDF MATCHING (Used as fallback)

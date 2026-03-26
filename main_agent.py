@@ -175,7 +175,7 @@ class HRRecruitmentAgent:
                 email_sender.send_acceptance_email(
                     candidate_email, candidate_name, job_title
                 )
-                email_sender.send_email(candidate_email, "pending")
+                # email_sender.send_email(candidate_email, "pending")
                 
                 # Attempt to schedule meeting
                 meeting_result = self.schedule_interview_for_candidate(

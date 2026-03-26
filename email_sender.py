@@ -64,7 +64,7 @@ If you have any questions, please don't hesitate to reach out.
 {EMAIL_SIGNATURE}
 """
             
-            self.send_email(candidate_email, subject, body, is_html=False)
+            self.send_email(candidate_email, subject, message=body, is_html=False)
             print(f"✅ Acceptance email sent to {candidate_email}")
             
         except Exception as e:
