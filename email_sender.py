@@ -30,8 +30,8 @@ class EmailSender:
             print("⚠️  Check your .env file - GMAIL_ADDRESS and GMAIL_PASSWORD must be correct")
             return False
     
-    def send_acceptance_email(self, candidate_email, candidate_name, job_title, meeting_link=None, meeting_time=None):
-        """Send acceptance email to candidate"""
+    def send_acceptance_email(self, candidate_email, candidate_name, job_title, meeting_link=None, meeting_time=None, meeting_passcode=None):
+        """Send acceptance email to candidate with meeting details"""
         try:
             subject = f"Great News! Your Application for {job_title} has been Accepted 🎉"
             
@@ -45,21 +45,29 @@ Your qualifications and experience align well with our requirements. We would li
 """
             
             if meeting_link and meeting_time:
+                passcode_text = f"Passcode: {meeting_passcode}\n" if meeting_passcode else ""
                 body += f"""
 📅 INTERVIEW DETAILS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Date & Time: {meeting_time}
 Interview Link: {meeting_link}
-Type: Google Meet (Video Call)
+{passcode_text}Type: Google Meet (Video Call)
 Duration: 30 minutes
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Please join 5 minutes early.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 BEFORE THE INTERVIEW:
+✓ Join 5 minutes early
+✓ Test your camera and microphone
+✓ Be in a quiet environment
+✓ Have a good internet connection
+✓ Keep your resume/portfolio ready
+
+❓ If you have any questions or need to reschedule, please reply to this email or contact HR.
 
 """
             
             body += f"""
-If you have any questions, please don't hesitate to reach out.
+Best regards,
 
 {EMAIL_SIGNATURE}
 """

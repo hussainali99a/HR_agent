@@ -130,3 +130,5 @@ resumes/
 *.db
 *.csv
 credentials.json
+oauth_credentials.json
+token.pickle

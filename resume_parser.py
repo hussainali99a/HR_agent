@@ -182,8 +182,10 @@ def extract_candidate_name_from_filename(file_path):
     filename = os.path.basename(file_path)
     # Remove all file extensions (.pdf, .docx, .doc)
     name = filename.rsplit('.', 1)[0]
-    # Replace underscores with spaces
-    name = name.replace('_', ' ')
+    # Remove version numbers like (1), (2), etc.
+    name = re.sub(r'\s*\(\d+\)\s*', ' ', name)
+    # Replace underscores and hyphens with spaces
+    name = name.replace('_', ' ').replace('-', ' ')
     # Remove common resume keywords like 'resume', 'cv', 'cv_', etc.
     name = re.sub(r'\s*(resume|cv|cv_|application|candidate)\s*', ' ', name, flags=re.IGNORECASE)
     # Clean up multiple spaces
@@ -195,15 +197,50 @@ def extract_candidate_name_from_filename(file_path):
 def extract_candidate_name_from_text(resume_text):
     """Try to extract name from resume text itself"""
     lines = resume_text.split('\n')
-    # Usually name is in first few lines
-    for line in lines[:10]:
+    
+    # Common institution/company names to skip
+    skip_patterns = [
+        'email', 'phone', 'address', 'experience', 'education', 'objective',
+        'university', 'college', 'institute', 'school', 'academy', 'institute of',
+        'sibm', 'iit', 'mit', 'stanford', 'harvard', 'delhi', 'mumbai', 'pune',
+        'sistec', 'nvcc', 'bsnl', 'accenture', 'cognizant', 'infosys', 'tcs',
+        'linkedin', 'github', 'portfolio', 'website', 'summary', 'profile', 'about',
+        'skills', 'projects', 'internship', 'certification', 'languages', 'hobbies'
+    ]
+    
+    # First, look for explicit "Name:" patterns
+    for line in lines[:20]:
+        if 'name:' in line.lower() or 'name -' in line.lower():
+            # Extract text after "Name:"
+            match = re.search(r'(?:name\s*[:|-]?\s*)([A-Za-z\s\.]+)', line, re.IGNORECASE)
+            if match:
+                name = match.group(1).strip().title()
+                if len(name.split()) >= 2 and len(name) < 60:
+                    return name
+    
+    # Check first 15 lines for candidate name
+    for line in lines[:15]:
         line = line.strip()
-        # Skip empty lines and common headers
-        if line and len(line) < 100 and not any(keyword in line.lower() for keyword in ['email', 'phone', 'address', 'experience', 'education', 'objective']):
-            # Likely a name if it's short and has proper capitalization
-            words = line.split()
-            if 2 <= len(words) <= 4:  # Names typically have 2-4 words
-                return line.title()
+        
+        # Skip empty lines and known non-name lines
+        if not line or len(line) > 100:
+            continue
+        
+        # Skip if line contains skip keywords
+        if any(keyword in line.lower() for keyword in skip_patterns):
+            continue
+        
+        # Likely a name if it's 2-4 words, all capitalized or title case
+        words = line.split()
+        
+        if 2 <= len(words) <= 4:
+            # Check if has typical name patterns
+            # Names usually start with capital letters
+            if all(word[0].isupper() for word in words if word):
+                # Filter out lines with numbers, special chars (except hyphen, apostrophe)
+                if not re.search(r'[0-9@#$%^&*()+=\[\]{}|;:,<>?/\\~`]', line):
+                    return line.title()
+    
     return None
 
 if __name__ == "__main__":

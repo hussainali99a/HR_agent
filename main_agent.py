@@ -75,10 +75,20 @@ class HRRecruitmentAgent:
             candidate_info = extract_candidate_info(resume_text)
             candidate_email = candidate_info.get('emails', ['unknown@email.com'])[0]
             
-            # Try to extract name from resume text first, then from filename
-            candidate_name = extract_candidate_name_from_text(resume_text)
-            if not candidate_name:
-                candidate_name = extract_candidate_name_from_filename(filename)
+            # Extract name from text and filename
+            name_from_text = extract_candidate_name_from_text(resume_text)
+            name_from_file = extract_candidate_name_from_filename(filename)
+            
+            # Smart name selection:
+            # - Prefer name from text IF it has more words than filename
+            # - Otherwise use filename (usually more reliable)
+            # - Fallback to text if filename is just "Candidate"
+            if name_from_text and name_from_text != "Candidate":
+                text_word_count = len(name_from_text.split())
+                file_word_count = len(name_from_file.split())
+                candidate_name = name_from_text if text_word_count > file_word_count else name_from_file
+            else:
+                candidate_name = name_from_file if name_from_file != "Candidate" else name_from_text or "Candidate"
             
             print(f"📧 Email: {candidate_email}")
             print(f"📝 Resume size: {len(resume_text)} characters")
@@ -170,30 +180,41 @@ class HRRecruitmentAgent:
                 db.update_candidate_status(candidate_id, "ACCEPTED", score)
                 db.log_decision(candidate_id, "ACCEPT", decision['reason'])
                 
-                # Send acceptance email
+                # Setup variables
                 job_title = "our open position"  # Will be enhanced later
-                email_sender.send_acceptance_email(
-                    candidate_email, candidate_name, job_title
-                )
-                # email_sender.send_email(candidate_email, "pending")
+                meeting_link = None
+                meeting_time = None
+                meeting_passcode = None
+                meeting_scheduled = False
                 
-                # Attempt to schedule meeting
+                # Attempt to schedule meeting FIRST
                 meeting_result = self.schedule_interview_for_candidate(
                     candidate_id, candidate_name, candidate_email
                 )
                 
                 if meeting_result:
+                    meeting_scheduled = True
+                    meeting_link = meeting_result.get('meeting_link')
+                    meeting_time = meeting_result.get('meeting_time')
+                    meeting_passcode = meeting_result.get('meeting_passcode')
                     decision['meeting_scheduled'] = True
-                    decision['meeting_link'] = meeting_result.get('meeting_link')
-                    
-                    # Send email with meeting details
-                    email_sender.send_acceptance_email(
-                        candidate_email, candidate_name, job_title,
-                        meeting_link=meeting_result.get('meeting_link'),
-                        meeting_time=meeting_result.get('meeting_time')
-                    )
+                    decision['meeting_link'] = meeting_link
+                    decision['meeting_passcode'] = meeting_passcode
+                    decision['meeting_event_id'] = meeting_result.get('event_id')
                 else:
                     decision['meeting_scheduled'] = False
+                
+                # Send SINGLE acceptance email with or without meeting details
+                email_sender.send_acceptance_email(
+                    candidate_email, candidate_name, job_title,
+                    meeting_link=meeting_link,
+                    meeting_time=meeting_time,
+                    meeting_passcode=meeting_passcode
+                )
+                
+                # Log the email sent
+                email_subject = f"Great News! Your Application for {job_title} has been Accepted 🎉"
+                db.log_email(candidate_id, "ACCEPTANCE", email_subject, "SENT")
             
             elif score >= SCORE_HOLD_THRESHOLD:
                 decision['action'] = 'HOLD'
@@ -204,6 +225,9 @@ class HRRecruitmentAgent:
                 
                 # Send hold email
                 email_sender.send_hold_email(candidate_email, candidate_name, "our position")
+                
+                # Log the email
+                db.log_email(candidate_id, "HOLD", f"Application Under Review for our position ⏳", "SENT")
             
             else:
                 decision['action'] = 'REJECT'
@@ -214,6 +238,9 @@ class HRRecruitmentAgent:
                 
                 # Send rejection email
                 email_sender.send_rejection_email(candidate_email, candidate_name, "our position")
+                
+                # Log the email
+                db.log_email(candidate_id, "REJECTION", f"Application Status for our position", "SENT")
             
             return decision
         
@@ -222,9 +249,9 @@ class HRRecruitmentAgent:
             return {'action': 'ERROR', 'reason': str(e)}
     
     def schedule_interview_for_candidate(self, candidate_id, candidate_name, candidate_email):
-        """Try to schedule an interview for accepted candidate"""
+        """Try to schedule an interview for accepted candidate with fallback options"""
         try:
-            # Schedule for next working day, 10 AM
+            # Preferred time: next working day at 10 AM
             next_interview = datetime.now() + timedelta(days=1)
             
             # Make sure it's a working day (Mon-Fri)
@@ -232,6 +259,9 @@ class HRRecruitmentAgent:
                 next_interview += timedelta(days=1)
             
             next_interview = next_interview.replace(hour=10, minute=0, second=0)
+            
+            # Try to schedule at preferred time
+            print(f"📅 Attempting to schedule interview for {candidate_name} on {next_interview}")
             
             result = scheduler.schedule_interview(
                 candidate_name=candidate_name,
@@ -241,10 +271,35 @@ class HRRecruitmentAgent:
                 candidate_id=candidate_id
             )
             
-            return result
+            if result:
+                print(f"✅ Successfully scheduled meeting for {candidate_name}")
+                return result
+            
+            # If primary time fails, try 2 PM instead
+            print(f"⚠️  Could not schedule at 10 AM, trying 2 PM...")
+            next_interview = next_interview.replace(hour=14, minute=0, second=0)
+            
+            result = scheduler.schedule_interview(
+                candidate_name=candidate_name,
+                candidate_email=candidate_email,
+                job_title="our open position",
+                interview_date_time=next_interview,
+                candidate_id=candidate_id
+            )
+            
+            if result:
+                print(f"✅ Successfully scheduled meeting at 2 PM for {candidate_name}")
+                return result
+            
+            # If both fail, log the issue but don't stop the process
+            print(f"⚠️  Could not schedule automatic meeting for {candidate_name}")
+            print(f"    Candidate will need to schedule manually or HR will follow up")
+            return None
         
         except Exception as e:
-            print(f"⚠️  Could not schedule meeting: {e}")
+            print(f"⚠️  Error in meeting scheduling: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def process_all_resumes(self):
