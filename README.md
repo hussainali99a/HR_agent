@@ -1,8 +1,8 @@
-# 🤖 AI HR Recruitment Agent - Complete Documentation
+# 🤖 AI HR Recruitment Agent
 
-An intelligent, fully-automated recruitment system that evaluates resumes, schedules interviews, and sends professional emails to candidates using AI matching.
+An intelligent, fully-automated recruitment system that evaluates resumes, schedules Google Meet interviews with passcodes, and sends professional emails to candidates using AI matching.
 
-**Total Setup Time: 60-90 minutes (first time only)**
+**Total Setup Time: 45-60 minutes (first time only)**
 
 ---
 
@@ -21,14 +21,14 @@ An intelligent, fully-automated recruitment system that evaluates resumes, sched
 
 ## ✨ What It Does
 
-This AI-powered recruitment agent automates the entire hiring process:
+This AI-powered recruitment agent automates the entire hiring workflow:
 
-1. **📥 Receives Applications** - Candidates submit resumes (PDF/DOCX)
-2. **🤖 Analyzes Resumes** - AI matches resume to job requirements
-3. **🎯 Makes Decisions** - Auto-accepts, rejects, or flags for review
-4. **📧 Sends Emails** - Professional accept/reject notifications
-5. **📅 Schedules Meetings** - Creates Google Meet links automatically
-6. **📊 Tracks Everything** - Database and dashboard for insights
+1. **📥 Receives Applications** - Process submitted resumes (PDF/DOCX)
+2. **🤖 Analyzes Resumes** - AI matches resume skills to job requirements
+3. **🎯 Makes Decisions** - Automatically accepts, rejects, or flags for review
+4. **📧 Sends Emails** - Professional accept/reject/hold notifications
+5. **📅 Schedules Google Meet** - Creates real meeting links with passcodes
+6. **📊 Tracks Everything** - Database logs all decisions, meetings, and emails
 
 ---
 
@@ -59,16 +59,17 @@ Job Posted → Candidates Apply → Run Agent → AI Scores Each Resume
 ## 📥 System Requirements
 
 ### Must Have:
-- **Python 3.9+** (Download from python.org)
+- **Python 3.9+** (Download from [python.org](https://www.python.org/downloads/))
 - **Gmail Account** (with 2-Step Verification enabled)
-- **Google Account** (for Calendar/Meet)
+- **Google Account** (for Calendar and Meet - can be same as Gmail)
 - **Candidate Resume Files** (PDF or DOCX format)
 
-### Get These First:
-1. Gmail: yourname@gmail.com
-2. App Password (16 chars) from Gmail security settings
-3. Google Cloud credentials.json file
-4. Job description in text format
+### Setup Time:
+- Gmail + Google setup: 15 minutes
+- Python environment: 10 minutes
+- Configuration: 5 minutes
+- Verification: 5 minutes
+- **Total: 35-45 minutes**
 
 ---
 
@@ -96,57 +97,69 @@ Job Posted → Candidates Apply → Run Agent → AI Scores Each Resume
 
 ---
 
-### ✅ STEP 2: Google Calendar Setup (10 minutes)
+### ✅ STEP 2: Google OAuth2 Setup (10 minutes)
 
-#### Go to Google Cloud Console:
+This allows the agent to create real Google Meet links and schedule calendar events.
+
+#### Create Google Cloud Project:
 1. Visit: https://console.cloud.google.com
-2. Click project selector at the top
-3. Click **"NEW PROJECT"**
+2. At the top, click the **project selector** dropdown
+3. Click **NEW PROJECT**
 4. Name it: `HR_Agent`
-5. Click **CREATE**
+5. Click **CREATE** and wait for completion
 
-#### Enable Calendar API:
-1. Click **"ENABLE APIS AND SERVICES"** (top center)
+#### Enable Required APIs:
+1. In the left menu, click **APIs & Services** → **Library**
 2. Search for: `Google Calendar API`
-3. Click it → Click **ENABLE**
+3. Click it and select **ENABLE**
+4. Go back to Library
+5. Search for: `Google Meet API`
+6. Click it and select **ENABLE**
 
-#### Create Service Account:
-1. Left menu → **Credentials**
-2. **CREATE CREDENTIALS** → **Service Account**
-3. Fill in:
-   - **Name**: `hr-agent-user`
-   - **Description**: `HR Agent for scheduling`
-4. Click **CREATE AND CONTINUE**
-5. Click through any remaining screens
+#### Configure OAuth2 Consent Screen:
+1. Left menu: **APIs & Services** → **OAuth consent screen**
+2. Select: **External** (for testing)
+3. Click **CREATE**
+4. Fill in the form:
+   - **App name**: `HR Recruitment Agent`
+   - **Support email**: Your email
+   - **Developer contact**: Your email
+5. Click **SAVE AND CONTINUE**
+6. On **Scopes** page, click **ADD OR REMOVE SCOPES**
+7. Search and add:
+   - `https://www.googleapis.com/auth/calendar` (Calendar)
+   - `https://www.googleapis.com/auth/userinfo.email` (Email)
+8. Click **UPDATE** → **SAVE AND CONTINUE**
+9. On **Test Users** page:
+   - Click **ADD USERS**
+   - Add your email address (e.g., `yourname@gmail.com`)
+   - Click **ADD**
+10. Scroll down and click **SAVE AND CONTINUE**
 
-#### Download JSON Key:
-1. Go to **Credentials** page
-2. Find your service account (email like: `xxx@xxx.iam.gserviceaccount.com`)
-3. Click on it → **KEYS** tab
-4. **ADD KEY** → **Create new key** → **JSON**
-5. Click **CREATE**
-6. File downloads - **RENAME to `credentials.json`**
-7. **MOVE to `d:\HR_agent\` folder**
-
-#### Set Calendar Permissions:
-1. Visit: https://calendar.google.com
-2. Settings → Add your service account email as calendar
-3. Give it **Edit** permissions
+#### Create OAuth2 Credentials:
+1. Left menu: **APIs & Services** → **Credentials**
+2. Click **CREATE CREDENTIALS** → **OAuth 2.0 Client IDs**
+3. If prompted, first click **Configure Consent Screen** and complete above steps
+4. Select type: **Desktop application**
+5. Name it: `HR Agent Main`
+6. Click **CREATE**
+7. A dialog appears with your credentials
+8. Click **DOWNLOAD JSON**
+9. **Rename the file to**: `oauth_credentials.json`
+10. **Move it to**: `d:\HR_agent\` folder (same level as main_agent.py)
 
 ---
 
 ### ✅ STEP 3: Create Configuration File (2 minutes)
 
-1. Open Notepad
-2. Copy this template (replace YOUR info):
+1. Open **Notepad**
+2. Copy this configuration template (replace YOUR info):
 
 ```env
 GMAIL_ADDRESS=your_email@gmail.com
 GMAIL_PASSWORD=your_16_char_app_password_here
 
-GOOGLE_CREDENTIALS_FILE=credentials.json
-
-OPENAI_API_KEY=sk_your_key_here
+GOOGLE_OAUTH_CREDENTIALS=oauth_credentials.json
 
 DATABASE_FILE=candidates.db
 RESUME_FOLDER=resumes
@@ -160,12 +173,13 @@ SCORE_HOLD_THRESHOLD=0.50
 ```
 
 3. **Save as `.env`** in `d:\HR_agent\` folder
-   - **IMPORTANT**: Save as "All Files" type (no .txt extension!)
-   - File → Save As
+   - Click **File** → **Save As**
    - Filename: `.env`
-   - File type: All Files
+   - Save as type: **All Files** (not .txt!)
+   - Location: `d:\HR_agent\`
+   - Click **Save**
 
-**⚠️ SECRET FILE** - Never share or commit this!
+⚠️ **IMPORTANT:** This file contains secrets. Never share or commit it!
 
 ---
 
@@ -220,15 +234,16 @@ If any errors, see **Troubleshooting** section below.
 
 ### Folder Structure
 
-Your folder must look like this:
+Your project folder should look like this:
 
 ```
 d:\HR_agent\
-├── .env                          ← Your config (SECRET!)
-├── credentials.json              ← Google key (SECRET!)
+├── .env                          ← Your config (KEEP SECRET!)
+├── oauth_credentials.json        ← Google OAuth2 key (KEEP SECRET!)
 ├── requirements.txt
 ├── main_agent.py                 ← MAIN PROGRAM
 ├── dashboard.py                  ← View results
+├── google_auth.py                ← OAuth2 handler (new)
 ├── config.py
 ├── database.py
 ├── resume_parser.py
@@ -241,7 +256,7 @@ d:\HR_agent\
 ├── candidates_export.csv         ← Created automatically
 │
 └── resumes/
-    ├── job_description.txt       ← Your job posting
+    ├── job_description.txt       ← Your job requirements
     ├── candidate1.pdf
     └── candidate2.pdf
 ```
@@ -316,7 +331,7 @@ Then just double-click it!
 
 ```
 ✅ Configuration validated successfully!
-✅ Google Calendar service initialized
+✅ Google OAuth2 service initialized
 ✅ Job description loaded (3441 characters)
 
 ============================================================
@@ -329,20 +344,23 @@ Then just double-click it!
 Processing: John_Doe.pdf
 ============================================================
 ✅ Resume parsed: John_Doe.pdf (5234 characters)
-📧 Email: john@email.com
+📧 Email: john.doe@email.com
 
 📊 MATCH ANALYSIS:
    Score: 78.5%
    Status: ACCEPT
    Reason: Strong match - 5+ years experience, Django expert
 
-🎯 DECISION: ACCEPT
-   Reason: Strong match (78.5%) - Qualifications align well
+🎯 DECISION: ACCEPT (78.5%)
 
-✅ Acceptance email sent to john@email.com
+✅ Acceptance email sent to john.doe@email.com
 ✅ Interview scheduled for John Doe
-   Time: 2026-03-17T10:00:00
-   Link: https://meet.google.com/abc-defg-hij
+   📅 Date/Time: 2026-03-17 10:00 AM IST
+   🔗 Meet Link: https://meet.google.com/abc-defg-hij
+   🔐 Passcode: 123456
+   ⏱️ Duration: 30 minutes
+
+✅ Meeting logged to database
 
 ============================================================
 ```
@@ -450,10 +468,11 @@ Supported timezones: `America/New_York`, `Europe/London`, `Asia/Tokyo`, etc.
 
 ### Issue: "Module not found"
 
-**Cause:** Virtual environment not activated
+**Cause:** Virtual environment not activated or packages not installed
 
 **Fix:**
 ```powershell
+cd d:\HR_agent
 env-hr-agent\Scripts\activate
 pip install -r requirements.txt
 ```
@@ -462,83 +481,98 @@ pip install -r requirements.txt
 
 ### Issue: "GMAIL_ADDRESS not set in .env"
 
-**Cause:** `.env` file missing or empty
+**Cause:** `.env` file missing or incomplete
 
 **Fix:**
 1. Check `.env` exists in `d:\HR_agent\`
-2. Check it has content
+2. Verify it has all required variables
 3. Recreate if necessary (see Step 3 above)
 
 ---
 
-### Issue: "Credentials not found: credentials.json"
+### Issue: "oauth_credentials.json not found"
 
-**Cause:** Google JSON key missing or wrong location
+**Cause:** OAuth2 JSON key missing or in wrong location
 
 **Fix:**
-1. Download from Google Cloud Console
-2. Rename EXACTLY to: `credentials.json`
-3. Place in `d:\HR_agent\` (not subfolder)
-4. Check it's a valid JSON file
+1. Download fresh JSON from Google Cloud Console
+2. Rename EXACTLY to: `oauth_credentials.json`
+3. Place in `d:\HR_agent\` (same level as main_agent.py)
+4. Verify it's valid JSON (can open in text editor)
+
+---
+
+### Issue: "Access blocked: HR_agent has not completed the Google verification process"
+
+**Cause:** Your app is unverified and Gmail account not added as test user
+
+**Fix:**
+1. Go to Google Cloud Console
+2. Navigate to **OAuth consent screen** (left menu)
+3. Scroll down to **Test users** section
+4. Click **ADD USERS**
+5. Add your Gmail address: `your_email@gmail.com`
+6. Click **ADD**
+7. Save and return to consent screen
 
 ---
 
 ### Issue: "No resume files found"
 
-**Cause:** Files in wrong location or format
+**Cause:** Files in wrong location or unsupported format
 
 **Fix:**
-1. Check files in `resumes/` folder
-2. Check extensions: `.pdf`, `.docx`, or `.doc`
-3. Make sure names don't have weird characters
-4. No `.lnk` shortcuts, only actual files
+1. Check files are in `resumes/` folder (not subfolders)
+2. Verify extensions: `.pdf`, `.docx`, or `.doc`
+3. No shortcuts (.lnk) - use actual file copies
+4. Filenames without special characters
 
 ---
 
 ### Issue: "No text extracted from PDF"
 
-**Cause:** PDF is scanned image, not text-based
+**Cause:** PDF is a scanned image, not text-based
 
 **Fix:**
-1. Use online tool to convert PDF (ilovepdf.com)
+1. Use online tool (ilovepdf.com) to convert
 2. Or export PDF again from original document
-3. Or convert to DOCX format instead
+3. Or save as DOCX instead and use that
 
 ---
 
 ### Issue: "Email credential error"
 
-**Cause:** App password wrong or 2-Step not enabled
+**Cause:** App password incorrect or 2-Step not enabled
 
 **Fix:**
-1. Check 2-Step Verification is ON
+1. Verify 2-Step Verification is ON at myaccount.google.com
 2. Check app password is exactly right (16 chars with spaces)
-3. Make sure it's the app password, not regular password
-4. Generate new app password if needed
+3. Ensure it's an app password, not your main Gmail password
+4. Generate new app password if needed at myaccount.google.com/apppasswords
 
 ---
 
-### Issue: "Authentication failed"
+### Issue: "Calendar event failed to create"
 
-**Cause:** Gmail 2-Step not enabled
+**Cause:** OAuth2 token expired or invalid permissions
 
 **Fix:**
-1. Go to: https://myaccount.google.com/security
-2. Find "2-Step Verification"
-3. Enable it (need your phone)
-4. Get new app password
+1. Delete `token.pickle` file if it exists
+2. Run script again - it will request new authorization
+3. Verify test user added to Google Cloud OAuth consent screen
+4. Check "Calendar" scope is added in OAuth consent screen
 
 ---
 
-### Issue: "Google Calendar error"
+### Issue: "ServiceAccountCredentials error"
 
-**Cause:** Service account not set up correctly
+**Cause:** Old service account credentials still being used
 
 **Fix:**
-1. Check service account created in Google Cloud
-2. Check service account email is added to Google Calendar
-3. Verify Edit permissions set
-4. Check credentials.json is valid
+1. Delete any `credentials.json` file
+2. Ensure `.env` uses `oauth_credentials.json`
+3. Update `meet_scheduler.py` to use OAuth2 (already done in current version)
+4. Run validation: `python validate_setup.py`
 
 ---
 
@@ -560,35 +594,37 @@ python main_agent.py
 
 | File | Purpose |
 |------|---------|
-| `main_agent.py` | Main program - processes resumes and makes decisions |
-| `dashboard.py` | Streamlit dashboard - view and analyze results |
-| `validate_setup.py` | Validation script - checks configuration |
+| `main_agent.py` | Main program - processes resumes, makes decisions, schedules meetings |
+| `dashboard.py` | Streamlit dashboard - view results and analytics |
+| `validate_setup.py` | Validation script - checks configuration and dependencies |
 | `requirements.txt` | Python package dependencies |
-| `config.py` | Configuration management |
-| `database.py` | SQLite database operations |
+| `config.py` | Configuration management and .env loading |
+| `database.py` | SQLite database operations and logging |
 
 ### Processing Modules
 
 | File | Purpose |
 |------|---------|
-| `resume_parser.py` | Extract text from PDF/DOCX files |
-| `candidate_matcher.py` | AI scoring - match resume to job |
-| `email_sender.py` | Gmail - send emails to candidates |
-| `meet_scheduler.py` | Google Calendar - schedule interviews |
+| `resume_parser.py` | Extract text from PDF/DOCX/DOC files |
+| `candidate_matcher.py` | AI scoring - match resume skills to job requirements |
+| `email_sender.py` | Gmail integration - send acceptance/rejection emails |
+| `meet_scheduler.py` | Google Calendar/Meet - schedule interviews with passcodes |
+| `google_auth.py` | OAuth2 token management and authentication |
 
 ### Configuration (Keep Secret!)
 
 | File | Purpose |
 |------|---------|
-| `.env` | Your credentials (Gmail, Google, settings) |
-| `credentials.json` | Google Calendar service account JSON |
+| `.env` | Your credentials (Gmail, Google OAuth2, settings) |
+| `oauth_credentials.json` | Google OAuth2 credentials (download from Cloud Console) |
 
 ### Data Files (Created Automatically)
 
 | File | Purpose |
 |------|---------|
 | `candidates.db` | SQLite database with all candidate data |
-| `candidates_export.csv` | CSV export of candidates |
+| `candidates_export.csv` | CSV export of candidate information |
+| `token.pickle` | OAuth2 token cache (auto-created, can be deleted) |
 
 ---
 
@@ -599,14 +635,10 @@ python main_agent.py
 GMAIL_ADDRESS=your_email@gmail.com
 GMAIL_PASSWORD=your_16_character_app_password_here
 
-# Google Calendar (For scheduling meetings)
-GOOGLE_CREDENTIALS_FILE=credentials.json
-GOOGLE_CALENDAR_ID=primary
+# Google OAuth2 (For Calendar and Meet scheduling)
+GOOGLE_OAUTH_CREDENTIALS=oauth_credentials.json
 
-# OpenAI (Optional, for future features)
-OPENAI_API_KEY=sk_your_key_here
-
-# Database (Where data is stored)
+# Database (Where candidate data is stored)
 DATABASE_FILE=candidates.db
 RESUME_FOLDER=resumes
 JOB_DESCRIPTION_FILE=resumes/job_description.txt
@@ -618,7 +650,7 @@ INTERVIEW_TIMEZONE=Asia/Kolkata
 # Scoring Thresholds (0 to 1 scale)
 SCORE_ACCEPT_THRESHOLD=0.70      # 70% or above = Accept
 SCORE_HOLD_THRESHOLD=0.50        # 50-70% = Hold (review)
-# Below 50% = Reject
+                                 # Below 50% = Reject
 ```
 
 ---
@@ -721,18 +753,29 @@ SCORE_HOLD_THRESHOLD=0.50        # 50-70% = Hold (review)
 ## 🔒 Security Best Practices
 
 ### Always:
-- ✅ Keep `.env` and `credentials.json` secret
+- ✅ Keep `.env` and `oauth_credentials.json` secret
 - ✅ Use App Passwords (not main Gmail password)
-- ✅ Add these files to `.gitignore`
-- ✅ Never share or commit these files
+- ✅ Delete `token.pickle` when sharing code
+- ✅ Add these files to `.gitignore` (already configured)
+- ✅ Never commit secret files to version control
 - ✅ Rotate credentials periodically
+- ✅ Use OAuth2 (more secure than service accounts)
+
+### OAuth2 Best Practices:
+- ✅ Keep consent screen in "Testing" mode during development
+- ✅ Add only your email as test user initially
+- ✅ Request minimal scopes (calendar, email only)
+- ✅ Delete and regenerate credentials if leaked
+- ✅ Never hardcode credentials in code
 
 ### In Production:
-- ✅ Use environment variables
-- ✅ Implement access controls
+- ✅ Move to "production" app status
+- ✅ Complete OAuth verification with Google
+- ✅ Use secure credential storage (AWS Secrets, etc.)
 - ✅ Enable audit logging
-- ✅ Follow GDPR/privacy laws
-- ✅ Respect candidate data privacy
+- ✅ Implement access controls
+- ✅ Follow GDPR and privacy regulations
+- ✅ Handle candidate data responsibly
 
 ---
 
@@ -777,27 +820,65 @@ SCORE_HOLD_THRESHOLD=0.50        # 50-70% = Hold (review)
 
 ---
 
-## 🚀 Next Steps
+## 🚀 Quick Start Checklist
 
-1. ✅ Follow **Complete Setup Guide** above (30 min)
-2. ✅ Run `python validate_setup.py` (5 min)
-3. ✅ Create `job_description.txt` (10 min)
-4. ✅ Add 1-2 test PDFs (2 min)
-5. ✅ Run `python main_agent.py` (5 min)
-6. ✅ View `streamlit run dashboard.py` (5 min)
-7. ✅ Customize and deploy (ongoing)
+### Before Running:
+- [ ] Gmail 2-Step Verification enabled
+- [ ] Google Cloud project created
+- [ ] OAuth2 scopes added (Calendar, Email)
+- [ ] Test user email added to consent screen
+- [ ] `oauth_credentials.json` downloaded and placed in folder
+- [ ] `.env` file created with all variables
+- [ ] Python packages installed (`pip install -r requirements.txt`)
+- [ ] Validation passed (`python validate_setup.py`)
+
+### First Run:
+1. Add 1-2 test resumes to `resumes/` folder
+2. Create `resumes/job_description.txt` with job requirements
+3. Run: `python main_agent.py`
+4. Watch as resumes are processed and meetings scheduled
+5. Check acceptance emails sent to candidates
+6. Verify Google Meet links in Google Calendar
+
+### View Results:
+1. Run: `streamlit run dashboard.py`
+2. View candidate statuses, scores, and meeting links
+3. Check email logs and analytics
+
+### Iterate:
+- Adjust scoring thresholds in `.env` if needed
+- Add more resumes and run again
+- Export data as CSV for analysis
 
 ---
 
-## 📞 Support
+## 📞 Getting Help
 
 ### If Something Goes Wrong:
 
-1. Read the **Troubleshooting** section above
-2. Run `python validate_setup.py`
-3. Check `.env` file content
-4. Review error messages carefully
-5. Check folder structure is correct
+1. **Read the error message** - It usually tells you exactly what's wrong
+2. **Run validation**: `python validate_setup.py`
+3. **Check your `.env` file** - Verify all variables are correct
+4. **Review the Troubleshooting section** above
+5. **Check folder structure** - Ensure all files are in right places
+6. **Verify Google Cloud setup** - Confirm OAuth2 scopes and test user
+
+### Common Issues Checklist:
+
+- [ ] Is `.env` file created and has `GMAIL_PASSWORD` and `GOOGLE_OAUTH_CREDENTIALS=oauth_credentials.json`?
+- [ ] Does `oauth_credentials.json` exist in `d:\HR_agent\`?
+- [ ] Is your email added as test user in Google Cloud OAuth consent screen?
+- [ ] Did you enable both Calendar API and Meet API?
+- [ ] Are resume files in `resumes/` folder with correct extensions (.pdf, .docx)?
+- [ ] Is `job_description.txt` created in `resumes/` folder?
+- [ ] Did you activate the Python virtual environment?
+
+### Still Stuck?
+
+1. Delete `token.pickle` file and try again (forces new OAuth2 login)
+2. Run: `python validate_setup.py --verbose` for detailed diagnostics
+3. Check Python version: `python --version` (should be 3.9+)
+4. Reinstall packages: `pip install -r requirements.txt --upgrade`
 
 ### Common Success Indicators:
 
