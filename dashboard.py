@@ -2,220 +2,253 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import os
-from datetime import datetime
 
 from config import DATABASE_FILE
-from job_manager import (
-    create_job,
-    get_all_jobs,
-    save_uploaded_file,
-    download_resume_from_url
-)
+from job_manager import create_job, get_all_jobs, save_uploaded_file, download_resume_from_url
 from main_agent import HRRecruitmentAgent
 
 # =========================
-# PAGE CONFIG
+# CONFIG
 # =========================
-st.set_page_config(
-    page_title="AI HR Dashboard",
-    layout="wide"
-)
+st.set_page_config(page_title="AI Recruitment System", layout="wide")
 
-st.title("🤖 AI Recruitment Dashboard")
-
-# =========================
-# DB CONNECTION
-# =========================
 def get_db():
     return sqlite3.connect(DATABASE_FILE)
 
 
+st.title("🤖 AI Recruitment System")
+
 # =========================
-# SIDEBAR
+# SIDEBAR NAV
 # =========================
 page = st.sidebar.radio(
     "Navigation",
-    ["📂 Job Management", "👤 Candidates", "📊 Analytics"]
+    ["📊 Overview", "💼 Jobs", "👤 Candidates", "⚙️ Settings"]
 )
 
 
 # =========================
-# JOB MANAGEMENT PAGE
+# 📊 OVERVIEW DASHBOARD
 # =========================
-if page == "📂 Job Management":
+if page == "📊 Overview":
 
-    st.header("📂 Job Management")
+    st.header("📊 System Overview")
+
+    conn = get_db()
+
+    candidates = pd.read_sql("SELECT * FROM candidates", conn)
+    jobs = get_all_jobs()
+
+    total_jobs = len(jobs)
+    total_candidates = len(candidates)
+    accepted = len(candidates[candidates["status"] == "ACCEPTED"])
+    rejected = len(candidates[candidates["status"] == "REJECTED"])
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("Jobs Posted", total_jobs)
+    col2.metric("Candidates Screened", total_candidates)
+    col3.metric("Accepted", accepted)
+    col4.metric("Rejected", rejected)
+
+    st.markdown("---")
+
+    if not candidates.empty:
+        st.subheader("📈 Hiring Funnel")
+        st.bar_chart(candidates["status"].value_counts())
+
+
+
+# =========================
+# 💼 JOBS DASHBOARD
+# =========================
+elif page == "💼 Jobs":
+
+    st.header("💼 Jobs Dashboard")
 
     # CREATE JOB
     with st.expander("➕ Create Job"):
-        job_id = st.text_input("Job ID (01, 02...)")
+        job_title = st.text_input("Job Title")
+        job_profile = st.text_input("Job Profile")
         jd_text = st.text_area("Job Description")
 
-        if st.button("Create Job"):
-            try:
-                create_job(job_id, jd_text)
-                st.success(f"Job {job_id} created")
-            except Exception as e:
-                st.error(str(e))
+        if st.button("Create Job", type="primary"):
+            job = create_job(job_title, jd_text, job_profile)
+            st.success(f"Job Created: {job['job_id']}")
 
     jobs = get_all_jobs()
 
     if not jobs:
-        st.warning("No jobs found")
+        st.warning("No jobs available")
         st.stop()
 
-    job_ids = [job["job_id"] for job in jobs]
+    job_ids = [j["job_id"] for j in jobs]
     selected_job = st.selectbox("Select Job", job_ids)
 
-    job_path = os.path.join("resumes", selected_job)
+    conn = get_db()
 
-    st.info(f"📁 {job_path}")
+    df = pd.read_sql(
+        "SELECT * FROM candidates WHERE job_id=?",
+        conn,
+        params=(selected_job,)
+    )
 
-    # UPLOAD
-    st.subheader("📤 Upload Resumes")
-    files = st.file_uploader("Upload resumes", accept_multiple_files=True)
+    st.subheader("📊 Job Statistics")
 
-    if files:
-        for f in files:
-            save_uploaded_file(f, selected_job)
-        st.success(f"{len(files)} resumes uploaded")
+    col1, col2, col3 = st.columns(3)
 
-    # DOWNLOAD
-    st.subheader("🌐 Download Resume")
-    url = st.text_input("Resume URL")
+    col1.metric("Candidates", len(df))
+    col2.metric("Accepted", len(df[df["status"] == "ACCEPTED"]))
+    col3.metric("Rejected", len(df[df["status"] == "REJECTED"]))
 
-    if st.button("Download"):
-        try:
-            path = download_resume_from_url(url, selected_job)
-            st.success(f"Saved: {path}")
-        except Exception as e:
-            st.error(str(e))
+    if not df.empty:
+        st.bar_chart(df["status"].value_counts())
 
-    # SCREEN
-    st.subheader("🤖 Screening")
-
-    if st.button("Run Screening"):
-
-        with st.spinner("Processing..."):
-
-            agent = HRRecruitmentAgent(
-                job_id=selected_job,
-                job_folder=job_path
-            )
-
-            agent.process_job_resumes()
-
-        st.success("Screening complete")
-
-    # FILE LIST
-    st.subheader("📄 Files")
-    for f in os.listdir(job_path):
-        if f.endswith((".pdf", ".docx")):
-            st.write(f"📄 {f}")
 
 
 # =========================
-# CANDIDATES PAGE
+# 👤 CANDIDATES DASHBOARD
 # =========================
 elif page == "👤 Candidates":
 
-    st.header("👤 Candidates")
+    st.header("👤 Candidates Dashboard")
 
     conn = get_db()
 
     jobs = get_all_jobs()
-    job_ids = [job["job_id"] for job in jobs]
+    job_ids = [j["job_id"] for j in jobs]
 
-    selected_job = st.selectbox("Filter by Job", job_ids)
+    selected_job = st.selectbox("Select Job", job_ids)
 
-    df = pd.read_sql_query(
-        "SELECT * FROM candidates WHERE job_id = ? ORDER BY match_score DESC",
+    job_path = os.path.join("resumes", selected_job)
+
+    # ----------------------
+    # UPLOAD
+    # ----------------------
+    st.subheader("📤 Upload Resumes")
+
+    files = st.file_uploader("Upload", accept_multiple_files=True)
+
+    if files:
+        for f in files:
+            save_uploaded_file(f, selected_job)
+        st.success("Uploaded")
+
+    # ----------------------
+    # URL UPLOAD
+    # ----------------------
+    st.subheader("🌐 Bulk URL Upload")
+
+    urls = st.text_area("Paste URLs")
+
+    if st.button("Download URLs"):
+        for url in urls.split("\n"):
+            if url.strip():
+                download_resume_from_url(url.strip(), selected_job)
+        st.success("Downloaded")
+
+    # ----------------------
+    # SCREENING
+    # ----------------------
+    st.subheader("🤖 Screening")
+
+    if st.button("Run Screening"):
+        agent = HRRecruitmentAgent(
+            job_id=selected_job,
+            job_folder=job_path
+        )
+        agent.process_job_resumes()
+        st.success("Done")
+
+    # ----------------------
+    # LOAD DATA
+    # ----------------------
+    df = pd.read_sql(
+        "SELECT * FROM candidates WHERE job_id=? ORDER BY match_score DESC",
         conn,
         params=(selected_job,)
     )
 
     if df.empty:
-        st.warning("No candidates found")
+        st.warning("No candidates yet")
         st.stop()
 
-    # FORMAT
     df["match_score"] = (df["match_score"] * 100).round(1)
 
-    st.subheader("🏆 Ranked Candidates")
+    st.subheader("🏆 Candidates")
 
-    st.dataframe(
-        df[["name", "email", "match_score", "status"]],
-        use_container_width=True
-    )
+    st.dataframe(df[["id", "name", "match_score", "status"]])
 
-    # ACTION PANEL
-    st.subheader("⚡ Take Action")
+    # ----------------------
+    # DETAIL VIEW
+    # ----------------------
+    st.subheader("🔍 Candidate Detail")
 
-    selected_candidate = st.selectbox(
-        "Select Candidate",
-        df["id"]
-    )
+    selected_id = st.selectbox("Select Candidate ID", df["id"])
 
+    candidate = df[df["id"] == selected_id].iloc[0]
+
+    st.markdown(f"""
+    ### {candidate['name']}
+
+    **Email:** {candidate['email']}  
+    **Phone:** {candidate['phone']}  
+    **LinkedIn:** {candidate['linkedin']}  
+
+    **Skills:** {candidate['skills']}  
+    **Experience:** {candidate['experience']} years  
+
+    **Match Score:** {candidate['match_score']}%  
+    **Status:** {candidate['status']}  
+    """)
+
+    # ACTIONS
     col1, col2 = st.columns(2)
 
     with col1:
-        if st.button("✅ Shortlist"):
+        if st.button("Shortlist"):
             conn.execute(
                 "UPDATE candidates SET status='SHORTLISTED' WHERE id=?",
-                (selected_candidate,)
+                (selected_id,)
             )
             conn.commit()
             st.success("Shortlisted")
 
     with col2:
-        if st.button("❌ Reject"):
+        if st.button("Reject"):
             conn.execute(
                 "UPDATE candidates SET status='REJECTED' WHERE id=?",
-                (selected_candidate,)
+                (selected_id,)
             )
             conn.commit()
             st.success("Rejected")
 
 
+
 # =========================
-# ANALYTICS PAGE
+# ⚙️ SETTINGS DASHBOARD
 # =========================
-elif page == "📊 Analytics":
+elif page == "⚙️ Settings":
 
-    st.header("📊 Analytics")
+    st.header("⚙️ System Settings")
 
-    conn = get_db()
+    st.subheader("🔌 Connectivity Check")
 
-    jobs = get_all_jobs()
-    job_ids = [job["job_id"] for job in jobs]
+    try:
+        conn = get_db()
+        conn.execute("SELECT 1")
+        st.success("Database Connected")
+    except:
+        st.error("Database Error")
 
-    selected_job = st.selectbox("Select Job", job_ids)
+    st.subheader("📁 Resume Folder Check")
 
-    df = pd.read_sql_query(
-        "SELECT * FROM candidates WHERE job_id = ?",
-        conn,
-        params=(selected_job,)
-    )
+    if os.path.exists("resumes"):
+        st.success("Resumes folder OK")
+    else:
+        st.error("Resumes folder missing")
 
-    if df.empty:
-        st.warning("No data")
-        st.stop()
+    st.subheader("⚡ System Info")
 
-    # METRICS
-    total = len(df)
-    accepted = len(df[df["status"] == "ACCEPTED"])
-    rejected = len(df[df["status"] == "REJECTED"])
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Total", total)
-    col2.metric("Accepted", accepted)
-    col3.metric("Rejected", rejected)
-
-    # DISTRIBUTION
-    st.subheader("📈 Score Distribution")
-    st.bar_chart(df["match_score"])
-
-    # STATUS BREAKDOWN
-    st.subheader("📊 Status Breakdown")
-    st.bar_chart(df["status"].value_counts())
+    st.write("Environment: Local")
+    st.write("Status: Running")

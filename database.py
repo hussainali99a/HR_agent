@@ -1,41 +1,82 @@
 import sqlite3
 from datetime import datetime
-import os
 from config import DATABASE_FILE
 
 
-class CandidateDatabase:
-    """Manages all database operations for candidates"""
-
+class Database:
     def __init__(self):
         self.db_file = DATABASE_FILE
-        self.create_tables()
-        self.ensure_schema_updates()
+        self.init_db()
 
     # =========================
-    # TABLE CREATION
+    # INIT DATABASE
     # =========================
-    def create_tables(self):
+    def init_db(self):
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
 
-        # Candidates table (BASE STRUCTURE)
+        # =========================
+        # JOBS TABLE
+        # =========================
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS candidates (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                email TEXT,
-                phone TEXT,
-                resume_file TEXT,
-                match_score REAL,
-                summary TEXT,
-                status TEXT,
-                created_at TEXT,
-                application_date TEXT
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                profile TEXT,
+                description TEXT,
+                folder_path TEXT,
+                created_at TEXT
             )
         ''')
 
-        # Email logs
+        # =========================
+        # CANDIDATES TABLE
+        # =========================
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS candidates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id TEXT,
+
+                name TEXT,
+                email TEXT,
+                phone TEXT,
+
+                resume_file TEXT,
+                file_hash TEXT,
+
+                match_score REAL,
+                status TEXT,
+
+                summary TEXT,
+
+                skills TEXT,
+                experience INTEGER,
+                linkedin TEXT,
+
+                created_at TEXT,
+                application_date TEXT,
+
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            )
+        ''')
+
+        # =========================
+        # DECISIONS TABLE
+        # =========================
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS decisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                candidate_id INTEGER,
+                decision TEXT,
+                reason TEXT,
+                made_at TEXT,
+                FOREIGN KEY(candidate_id) REFERENCES candidates(id)
+            )
+        ''')
+
+        # =========================
+        # EMAIL LOGS
+        # =========================
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS email_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,11 +84,14 @@ class CandidateDatabase:
                 email_type TEXT,
                 subject TEXT,
                 status TEXT,
-                sent_at TEXT
+                sent_at TEXT,
+                FOREIGN KEY(candidate_id) REFERENCES candidates(id)
             )
         ''')
 
-        # Meetings
+        # =========================
+        # MEETINGS
+        # =========================
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS meetings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,192 +99,211 @@ class CandidateDatabase:
                 meeting_time TEXT,
                 meeting_link TEXT,
                 status TEXT,
-                created_at TEXT
-            )
-        ''')
-
-        # Decisions
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS decisions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                candidate_id INTEGER,
-                decision TEXT,
-                reason TEXT,
-                made_at TEXT
-            )
-        ''')
-
-        # OPTIONAL JOB TABLE (non-breaking)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS jobs (
-                id TEXT PRIMARY KEY,
-                folder_path TEXT,
-                created_at TEXT
+                created_at TEXT,
+                FOREIGN KEY(candidate_id) REFERENCES candidates(id)
             )
         ''')
 
         conn.commit()
         conn.close()
 
+        print("✅ Fresh database initialized")
+
     # =========================
-    # SAFE SCHEMA MIGRATION
+    # JOB OPERATIONS
     # =========================
-    def ensure_schema_updates(self):
-        """Ensure job_id column exists (non-breaking migration)"""
+    def add_job(self, job_id, title, profile, description, folder_path):
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
 
-        cursor.execute("PRAGMA table_info(candidates)")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        if "job_id" not in columns:
-            print("⚡ Adding job_id column to candidates table...")
-            cursor.execute("ALTER TABLE candidates ADD COLUMN job_id TEXT")
+        cursor.execute('''
+            INSERT INTO jobs (id, title, profile, description, folder_path, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            job_id,
+            title,
+            profile,
+            description,
+            folder_path,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
 
         conn.commit()
         conn.close()
 
-    # =========================
-    # ADD CANDIDATE (UPDATED)
-    # =========================
-    def add_candidate(self, name, email, phone, resume_file,
-                      match_score, summary, job_id=None):
+    def get_jobs(self):
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
 
-        try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
+        cursor.execute("SELECT * FROM jobs ORDER BY created_at DESC")
+        jobs = cursor.fetchall()
 
-            cursor.execute('''
-                INSERT INTO candidates 
-                (name, email, phone, resume_file, match_score, summary, status, created_at, application_date, job_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
+        conn.close()
+        return jobs
+
+    # =========================
+    # CANDIDATE OPERATIONS
+    # =========================
+    def add_candidate(
+        self,
+        job_id,
+        name,
+        email,
+        phone,
+        resume_file,
+        file_hash,
+        match_score,
+        summary,
+        skills,
+        experience,
+        linkedin,
+        status="NEW"
+    ):
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT INTO candidates (
+                job_id,
                 name,
                 email,
                 phone,
                 resume_file,
+                file_hash,
                 match_score,
+                status,
                 summary,
-                "NEW",
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                datetime.now().strftime("%Y-%m-%d"),
-                job_id
-            ))
+                skills,
+                experience,
+                linkedin,
+                created_at,
+                application_date
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            job_id,
+            name,
+            email,
+            phone,
+            resume_file,
+            file_hash,
+            match_score,
+            status,
+            summary,
+            skills,
+            experience,
+            linkedin,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            datetime.now().strftime("%Y-%m-%d")
+        ))
 
-            candidate_id = cursor.lastrowid
-            conn.commit()
-            conn.close()
+        candidate_id = cursor.lastrowid
 
-            print(f"✅ Candidate {name} added (ID: {candidate_id}, Job: {job_id})")
-            return candidate_id
+        conn.commit()
+        conn.close()
 
-        except sqlite3.IntegrityError:
-            print(f"⚠️ Candidate {email} already exists")
-            return None
-
-        except Exception as e:
-            print(f"❌ Error adding candidate: {e}")
-            return None
+        return candidate_id
 
     # =========================
-    # STATUS UPDATE
+    # UPDATE STATUS
     # =========================
-    def update_candidate_status(self, candidate_id, status, match_score=None):
-        try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
+    def update_candidate_status(self, candidate_id, status, score=None):
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
 
-            if match_score is not None:
-                cursor.execute('''
-                    UPDATE candidates 
-                    SET status = ?, match_score = ?
-                    WHERE id = ?
-                ''', (status, match_score, candidate_id))
-            else:
-                cursor.execute('''
-                    UPDATE candidates 
-                    SET status = ?
-                    WHERE id = ?
-                ''', (status, candidate_id))
+        if score is not None:
+            cursor.execute('''
+                UPDATE candidates
+                SET status=?, match_score=?
+                WHERE id=?
+            ''', (status, score, candidate_id))
+        else:
+            cursor.execute('''
+                UPDATE candidates
+                SET status=?
+                WHERE id=?
+            ''', (status, candidate_id))
 
-            conn.commit()
-            conn.close()
+        conn.commit()
+        conn.close()
 
-        except Exception as e:
-            print(f"❌ Error updating candidate: {e}")
+    # =========================
+    # FETCH BY JOB
+    # =========================
+    def get_candidates_by_job(self, job_id):
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT * FROM candidates
+            WHERE job_id=?
+            ORDER BY match_score DESC
+        ''', (job_id,))
+
+        data = cursor.fetchall()
+        conn.close()
+        return data
 
     # =========================
     # DECISION LOG
     # =========================
     def log_decision(self, candidate_id, decision, reason):
-        try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
 
-            cursor.execute('''
-                INSERT INTO decisions (candidate_id, decision, reason, made_at)
-                VALUES (?, ?, ?, ?)
-            ''', (
-                candidate_id,
-                decision,
-                reason,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ))
+        cursor.execute('''
+            INSERT INTO decisions (candidate_id, decision, reason, made_at)
+            VALUES (?, ?, ?, ?)
+        ''', (
+            candidate_id,
+            decision,
+            reason,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
 
-            conn.commit()
-            conn.close()
-
-        except Exception as e:
-            print(f"❌ Error logging decision: {e}")
+        conn.commit()
+        conn.close()
 
     # =========================
     # EMAIL LOG
     # =========================
     def log_email(self, candidate_id, email_type, subject, status):
-        try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
 
-            cursor.execute('''
-                INSERT INTO email_logs (candidate_id, email_type, subject, status, sent_at)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (
-                candidate_id,
-                email_type,
-                subject,
-                status,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ))
+        cursor.execute('''
+            INSERT INTO email_logs (candidate_id, email_type, subject, status, sent_at)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            candidate_id,
+            email_type,
+            subject,
+            status,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
 
-            conn.commit()
-            conn.close()
-
-        except Exception as e:
-            print(f"❌ Error logging email: {e}")
+        conn.commit()
+        conn.close()
 
     # =========================
-    # FILTER BY JOB (NEW)
+    # DUPLICATE CHECK
     # =========================
-    def get_candidates_by_job(self, job_id):
-        try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
+    def is_duplicate(self, file_hash):
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
 
-            cursor.execute('''
-                SELECT * FROM candidates WHERE job_id = ?
-                ORDER BY created_at DESC
-            ''', (job_id,))
+        cursor.execute(
+            "SELECT id FROM candidates WHERE file_hash=?",
+            (file_hash,)
+        )
 
-            results = cursor.fetchall()
-            conn.close()
-            return results
+        exists = cursor.fetchone() is not None
 
-        except Exception as e:
-            print(f"❌ Error fetching candidates: {e}")
-            return []
+        conn.close()
+        return exists
 
 
 # =========================
-# GLOBAL INSTANCE (UNCHANGED)
+# GLOBAL INSTANCE
 # =========================
-db = CandidateDatabase()
+db = Database()
