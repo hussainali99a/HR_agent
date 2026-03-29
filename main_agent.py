@@ -103,7 +103,7 @@ class HRRecruitmentAgent:
     # =========================
     # ENTRY POINT
     # =========================
-    def process_job_resumes(self):
+    def process_job_resumes(self, user_id=None, hr_email=None):
         if not self.job_description:
             print("❌ JD not loaded")
             return
@@ -113,12 +113,12 @@ class HRRecruitmentAgent:
         print(f"\n📂 Processing {len(files)} resumes (Job: {self.job_id})")
 
         for path in files:
-            self.process_single_resume(path)
+            self.process_single_resume(path, user_id, hr_email)
 
     # =========================
     # CORE PROCESS
     # =========================
-    def process_single_resume(self, resume_path):
+    def process_single_resume(self, resume_path, user_id=None, hr_email=None):
         try:
             filename = get_resume_filename(resume_path)
 
@@ -174,7 +174,9 @@ class HRRecruitmentAgent:
                 file_hash,
                 skills,
                 experience,
-                report
+                report,
+                user_id,
+                hr_email
             )
 
         except Exception as e:
@@ -195,7 +197,9 @@ class HRRecruitmentAgent:
         file_hash,
         skills,
         experience,
-        report
+        report,
+        user_id,
+        hr_email=None
     ):
 
         candidate_id = db.add_candidate(
@@ -209,7 +213,8 @@ class HRRecruitmentAgent:
             summary=report.get('reason', ''),
             skills=skills,
             experience=experience,
-            linkedin=linkedin
+            linkedin=linkedin,
+            user_id=user_id
         )
 
         decision = {
@@ -227,14 +232,16 @@ class HRRecruitmentAgent:
             decision["reason"] = f"Strong match ({score*100:.1f}%)"
 
             db.update_candidate_status(candidate_id, "ACCEPTED", score)
-            db.log_decision(candidate_id, "ACCEPT", decision["reason"])
+            db.log_decision(user_id, candidate_id, "ACCEPT", decision["reason"])
 
             meeting = scheduler.schedule_interview(
                 name,
                 email,
                 "Job Role",
                 datetime.now() + timedelta(days=1),
-                candidate_id
+                candidate_id,
+                user_id=user_id,
+                hr_email=hr_email
             )
 
             email_sender.send_acceptance_email(
@@ -250,14 +257,14 @@ class HRRecruitmentAgent:
             decision["reason"] = "Needs review"
 
             db.update_candidate_status(candidate_id, "UNDER_REVIEW", score)
-            db.log_decision(candidate_id, "HOLD", decision["reason"])
+            db.log_decision(user_id, candidate_id, "HOLD", decision["reason"])
 
         else:
             decision["action"] = "REJECT"
             decision["reason"] = "Low match"
 
             db.update_candidate_status(candidate_id, "REJECTED", score)
-            db.log_decision(candidate_id, "REJECT", decision["reason"])
+            db.log_decision(user_id,candidate_id, "REJECT", decision["reason"])
 
             email_sender.send_rejection_email(email, name, "Job Role")
 

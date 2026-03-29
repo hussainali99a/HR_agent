@@ -74,7 +74,7 @@ class MeetScheduler:
             return None
     
     def schedule_interview(self, candidate_name, candidate_email, job_title, 
-                          interview_date_time, candidate_id=None):
+                          interview_date_time, candidate_id=None, user_id=None, hr_email=None):
         """
         Schedule an interview with Google Meet
         
@@ -140,7 +140,8 @@ Questions? Contact HR immediately.
                     'timeZone': self.timezone,
                 },
                 'attendees': [
-                    {'email': candidate_email, 'responseStatus': 'needsAction'}
+                    {'email': candidate_email, 'responseStatus': 'needsAction'},
+                    {'email': hr_email, 'responseStatus': 'needsAction'}
                 ]
             }
             
@@ -182,7 +183,7 @@ Questions? Contact HR immediately.
             
             # Log to database
             if candidate_id:
-                db.log_meeting(candidate_id, meeting_time, meeting_link or calendar_link, "SCHEDULED")
+                db.schedule_interview(candidate_id, user_id, meeting_link, meeting_time)
             
             return {
                 'meeting_link': meeting_link or calendar_link,

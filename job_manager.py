@@ -28,7 +28,8 @@ def create_job(job_title, job_description, job_profile):
         "job_id": job_id,
         "title": job_title,
         "profile": job_profile,
-        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "folder_path": folder_path
     }
 
     import json

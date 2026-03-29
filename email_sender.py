@@ -430,6 +430,64 @@ class EmailSender:
             
         except Exception as e:
             print(f"❌ Error sending reminder email: {e}")
+
+    def send_verification_email(self, user_email, user_name, verification_link):
+        """Send email verification link to user"""
+        try:
+            subject = "Verify Your Email Address"
+
+            content = f"""
+            <h2>Hi {user_name.title()},</h2>
+            
+            <p>
+                Thank you for signing up! To complete your registration and activate your account,
+                please verify your email address by clicking the button below.
+            </p>
+
+            <div class="section-box" style="border-left-color: {self.PRIMARY_COLOR};">
+                <p style="margin-top: 0; font-weight: 600; color: {self.PRIMARY_COLOR};">
+                    🔐 EMAIL VERIFICATION REQUIRED
+                </p>
+                <p style="margin-bottom: 0;">
+                    Click the button below to securely verify your email.
+                </p>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="{verification_link}" class="button">
+                    Verify Email
+                </a>
+            </div>
+
+            <p style="margin-top: 20px;">
+                If the button above doesn’t work, you can also copy and paste the link below into your browser:
+            </p>
+
+            <p style="word-break: break-all; color: {self.SECONDARY_COLOR}; font-size: 14px;">
+                {verification_link}
+            </p>
+
+            <div class="section-box" style="border-left-color: {self.SECONDARY_COLOR};">
+                <p style="margin: 0; font-size: 13px; color: {self.SECONDARY_COLOR};">
+                    ⚠️ This link will expire for security reasons. If you did not create an account,
+                    you can safely ignore this email.
+                </p>
+            </div>
+
+            <p style="margin-top: 30px;">
+                Best regards,<br>
+                <strong style="color: {self.PRIMARY_COLOR};">Recruitment Team</strong><br>
+                HR Department
+            </p>
+            """
+
+            html_content = self.get_email_wrapper(content)
+            self.send_email(user_email, subject, html_content, is_html=True)
+
+            print(f"✅ Verification email sent to {user_email}")
+
+        except Exception as e:
+            print(f"❌ Error sending verification email: {e}")
     
     def send_email(self, receiver, subject, message, is_html=False):
         """Generic email sending function"""
